@@ -24,7 +24,7 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
 */
-
+#include <Arduino.h>
 #define VERSION "Wind v3 18-Sep-2015"
 
 #include "PString.h"
