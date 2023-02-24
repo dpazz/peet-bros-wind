@@ -26,9 +26,7 @@
 */
 #include <Arduino.h>
 #define VERSION "Wind v3 18-Sep-2015"
-
 #include "PString.h"
-
 #define windSpeedPin 2
 #define windDirPin 3
 #define windSpeedINT 0 // INT0
