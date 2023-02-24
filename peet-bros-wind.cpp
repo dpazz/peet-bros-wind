@@ -68,25 +68,6 @@ volatile boolean ignoreNextReading = false;
 
 boolean debug = false;
 
-void setup()
-{
-    pinMode(LED, OUTPUT);
-
-    Serial.begin(38400, SERIAL_8N1);
-    Serial.println(VERSION);
-    Serial.print("Direction Filter: ");
-    Serial.println(filterGain);
-
-    pinMode(windSpeedPin, INPUT);
-    attachInterrupt(windSpeedINT, readWindSpeed, FALLING);
-
-    pinMode(windDirPin, INPUT);
-    attachInterrupt(windDirINT, readWindDir, FALLING);
-
-    interrupts();
-}
-
-
 void readWindSpeed()
 {
     // Despite the interrupt being set to FALLING edge, double check the pin is now LOW
@@ -143,6 +124,56 @@ boolean checkSpeedDev(long knots, int dev)
         if (abs(dev) < SPEED_DEV_LIMIT_2) return true;
     }
     return false;
+}
+
+byte getChecksum(char* str)
+{
+    byte cs = 0;
+    for (unsigned int n = 1; n < strlen(str) - 1; n++)
+    {
+        cs ^= str[n];
+    }
+    return cs;
+}
+
+/*=== MWV - Wind Speed and Angle ===
+ *
+ * ------------------------------------------------------------------------------
+ *         1   2 3   4 5
+ *         |   | |   | |
+ *  $--MWV,x.x,a,x.x,a*hh<CR><LF>
+ * ------------------------------------------------------------------------------
+ *
+ * Field Number:
+ *
+ * 1. Wind Angle, 0 to 360 degrees
+ * 2. Reference, R = Relative, T = True
+ * 3. Wind Speed
+ * 4. Wind Speed Units, K/M/N
+ * 5. Status, A = Data Valid
+ * 6. Checksum
+ *
+ */
+void printWindNmea()
+{
+    char windSentence [30];
+    float spd = knotsOut / 100.0;
+    byte cs;
+    //Assemble a sentence of the various parts so that we can calculate the proper checksum
+
+    PString str(windSentence, sizeof(windSentence));
+    str.print("$WIMWV,");
+    str.print(dirOut);
+    str.print(".0,R,");
+    str.print(spd);
+    str.print(",N,A*");
+    //calculate the checksum
+
+    cs = getChecksum(windSentence);
+    //bug - arduino prints 0x007 as 7, 0x02B as 2B, so we add it now
+    if (cs < 0x10) str.print('0');
+    str.print(cs, HEX); // Assemble the final message and send it out the serial port
+    Serial.println(windSentence);
 }
 
 void calcWindSpeedAndDir()
@@ -265,56 +296,23 @@ void calcWindSpeedAndDir()
     }
 }
 
-byte getChecksum(char* str)
+void setup()
 {
-    byte cs = 0;
-    for (unsigned int n = 1; n < strlen(str) - 1; n++)
-    {
-        cs ^= str[n];
-    }
-    return cs;
+    pinMode(LED, OUTPUT);
+
+    Serial.begin(38400, SERIAL_8N1);
+    Serial.println(VERSION);
+    Serial.print("Direction Filter: ");
+    Serial.println(filterGain);
+
+    pinMode(windSpeedPin, INPUT);
+    attachInterrupt(windSpeedINT, readWindSpeed, FALLING);
+
+    pinMode(windDirPin, INPUT);
+    attachInterrupt(windDirINT, readWindDir, FALLING);
+
+    interrupts();
 }
-
-/*=== MWV - Wind Speed and Angle ===
- *
- * ------------------------------------------------------------------------------
- *         1   2 3   4 5
- *         |   | |   | |
- *  $--MWV,x.x,a,x.x,a*hh<CR><LF>
- * ------------------------------------------------------------------------------
- *
- * Field Number:
- *
- * 1. Wind Angle, 0 to 360 degrees
- * 2. Reference, R = Relative, T = True
- * 3. Wind Speed
- * 4. Wind Speed Units, K/M/N
- * 5. Status, A = Data Valid
- * 6. Checksum
- *
- */
-void printWindNmea()
-{
-    char windSentence [30];
-    float spd = knotsOut / 100.0;
-    byte cs;
-    //Assemble a sentence of the various parts so that we can calculate the proper checksum
-
-    PString str(windSentence, sizeof(windSentence));
-    str.print("$WIMWV,");
-    str.print(dirOut);
-    str.print(".0,R,");
-    str.print(spd);
-    str.print(",N,A*");
-    //calculate the checksum
-
-    cs = getChecksum(windSentence);
-    //bug - arduino prints 0x007 as 7, 0x02B as 2B, so we add it now
-    if (cs < 0x10) str.print('0');
-    str.print(cs, HEX); // Assemble the final message and send it out the serial port
-    Serial.println(windSentence);
-}
-
 
 void loop()
 {
